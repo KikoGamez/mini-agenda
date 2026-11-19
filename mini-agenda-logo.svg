@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 360 96" width="720" height="192">
+  <title>Mini Agenda</title>
+  <!-- imagotipo: agenda de anillas con tic + nombre -->
+  <g transform="translate(8 8)">
+    <rect x="2" y="10" width="72" height="68" rx="20" fill="#F4EAD5"/>
+    <path d="M2 30a20 20 0 0 1 20-20h32a20 20 0 0 1 20 20v4H2z" fill="#2563EB"/>
+    <rect x="2" y="10" width="72" height="68" rx="20" fill="none" stroke="#152447" stroke-width="4"/>
+    <rect x="20" y="0" width="9" height="20" rx="4.5" fill="#152447"/>
+    <rect x="47" y="0" width="9" height="20" rx="4.5" fill="#152447"/>
+    <path d="M23 54l10 10 21-21" fill="none" stroke="#152447" stroke-width="8" stroke-linecap="round" stroke-linejoin="round"/>
+  </g>
+  <text x="104" y="62" font-family="'Baloo 2','Nunito',ui-rounded,system-ui,sans-serif" font-size="44" font-weight="800" fill="#152447" letter-spacing="-0.5">Mini<tspan fill="#2563EB" dx="8">Agenda</tspan></text>
+  <path d="M106 76c40 6 120 6 196-2" fill="none" stroke="#E7D7B4" stroke-width="6" stroke-linecap="round"/>
+</svg>
