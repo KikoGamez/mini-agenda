@@ -3,3 +3,6 @@
 .env.*
 supabase/.temp/
 supabase/.branches/
+
+# Versión antigua para Claude (lleva datos personales)
+mini-agenda.html
