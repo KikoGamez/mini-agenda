@@ -163,12 +163,37 @@ h1,h2,h3{font-family:var(--f-display);margin:0;text-wrap:balance;font-weight:700
 .cd.today.off,.cd.today{background:var(--accent)}
 .cd.today .n{color:var(--accent-ink)}
 .banner.off{background:var(--off-soft);color:var(--off)}
-.read{margin:14px 18px 0;display:flex;gap:14px;align-items:center;padding:12px 14px;border-radius:16px;border:1.5px dashed var(--t-proj);background:var(--t-proj-soft)}
+.read{margin:14px 18px 0;width:calc(100% - 36px);display:flex;gap:14px;align-items:center;padding:12px 14px;border-radius:16px;border:1.5px dashed var(--t-proj);background:var(--t-proj-soft);text-align:left;transition:transform .12s,box-shadow .2s}
+.read:hover{box-shadow:0 6px 18px -8px var(--t-proj)}
+.read:active{transform:scale(.98)}
+.read:focus-visible{outline:3px solid var(--t-proj);outline-offset:3px}
+.read .go{font-style:normal;margin-left:auto;flex:none;display:flex;align-items:center;gap:6px;background:var(--t-proj);color:var(--surface);border-radius:999px;padding:8px 14px;font-weight:800;font-size:15px;white-space:nowrap}
+.read .go svg{width:14px;height:14px}
+@media (max-width:520px){.read{flex-wrap:wrap}.read .go{margin-left:54px}}
 .read svg{width:40px;height:40px;flex:none}
-.read div{min-width:0}
+.read div{min-width:0;flex:1}
 .read small{display:block;font-size:12px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:var(--t-proj)}
 .read b{display:block;font-family:var(--f-display);font-size:20px;line-height:1.2}
 .read span{font-size:14px;color:var(--muted);font-weight:600}
+
+/* reading timer */
+.rt-bg{position:fixed;inset:0;z-index:30;display:flex;align-items:center;justify-content:center;padding:20px;background:rgba(10,16,36,.6)}
+.rt{background:var(--bg);width:100%;max-width:440px;border-radius:30px;padding:22px 24px 26px;display:flex;flex-direction:column;align-items:center;gap:14px;text-align:center;animation:up .28s ease;box-shadow:var(--shadow)}
+.rt-top{align-self:stretch;display:flex;justify-content:space-between;align-items:center;gap:10px}
+.rt-top small{font-size:12px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:var(--t-proj)}
+.rt h2{margin:0;font-size:26px;line-height:1.2}
+.rt-ring{position:relative;width:min(260px,64vw);aspect-ratio:1}
+.rt-ring svg{width:100%;height:100%;transform:rotate(-90deg)}
+.rt-ring .trk{stroke:var(--t-proj-soft)}
+.rt-ring .val{stroke:var(--t-proj);transition:stroke-dashoffset .4s linear}
+.rt-in{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px}
+.rt-time{font-family:var(--f-display);font-size:clamp(46px,14vw,64px);font-weight:800;line-height:1;font-variant-numeric:tabular-nums;color:var(--ink)}
+.rt-in span{font-size:14px;font-weight:700;color:var(--muted)}
+.rt-msg{margin:0;font-weight:700;color:var(--muted);min-height:1.4em}
+.rt-btns{display:flex;gap:10px;flex-wrap:wrap;justify-content:center}
+.rt.done .rt-ring .val{stroke:var(--ok)}
+.rt.paused .rt-time{opacity:.55}
+@media (prefers-reduced-motion:reduce){.rt-ring .val{transition:none}}
 
 .motto{width:100%;text-align:left;border:0;border-radius:24px;padding:18px 20px;background:var(--navy);color:#FFFFFF;display:flex;flex-direction:column;gap:6px;box-shadow:var(--shadow);position:relative;overflow:hidden}
 .motto small{font-size:12px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:var(--hl)}
@@ -428,6 +453,14 @@ h1,h2,h3{font-family:var(--f-display);margin:0;text-wrap:balance;font-weight:700
 <svg width="0" height="0" style="position:absolute" aria-hidden="true"><defs><g id="logo-mark" transform="translate(2 4)"><rect x="2" y="10" width="72" height="68" rx="20" fill="#F4EAD5"/><path d="M2 30a20 20 0 0 1 20-20h32a20 20 0 0 1 20 20v4H2z" fill="#2563EB"/><rect x="2" y="10" width="72" height="68" rx="20" fill="none" stroke="#152447" stroke-width="4"/><rect x="20" y="0" width="9" height="20" rx="4.5" fill="#152447"/><rect x="47" y="0" width="9" height="20" rx="4.5" fill="#152447"/><path d="M23 54l10 10 21-21" fill="none" stroke="#152447" stroke-width="8" stroke-linecap="round" stroke-linejoin="round"/></g></defs></svg>
 
 <div class="sheet-bg" id="sheet-bg" hidden><div class="sheet" id="sheet" role="dialog" aria-modal="true" aria-labelledby="sheet-title"></div></div>
+<div class="rt-bg" id="rt-bg" hidden><div class="rt" id="rt" role="dialog" aria-modal="true" aria-labelledby="rt-title">
+  <div class="rt-top"><small id="rt-kicker">Rato de lectura</small><button class="x" id="rt-x" aria-label="Salir del temporizador">×</button></div>
+  <h2 id="rt-title">30 minutos de lectura</h2>
+  <div class="rt-ring"><svg viewBox="0 0 120 120" aria-hidden="true"><circle class="trk" cx="60" cy="60" r="52" fill="none" stroke-width="11"/><circle class="val" id="rt-val" cx="60" cy="60" r="52" fill="none" stroke-width="11" stroke-linecap="round" stroke-dasharray="326.73" stroke-dashoffset="0"/></svg>
+    <div class="rt-in"><div class="rt-time" id="rt-time" role="timer" aria-live="off">30:00</div><span id="rt-sub">quedan</span></div></div>
+  <p class="rt-msg" id="rt-msg" aria-live="polite"></p>
+  <div class="rt-btns" id="rt-btns"></div>
+</div></div>
 <div class="toast" id="toast" hidden></div>
 <canvas id="confetti" aria-hidden="true"></canvas>
 
@@ -746,8 +779,8 @@ function render() {
   const off = holidayName(day);
   if (off) banners = `<div class="banner off">No hay cole: ${esc(off)}.${day >= t0 ? " ¡A disfrutar!" : ""}</div>` + banners;
   const lang = readingLang(day);
-  banners += `<div class="read"><svg viewBox="0 0 40 40" aria-hidden="true"><rect x="4" y="8" width="16" height="25" rx="3" fill="var(--t-proj)"/><rect x="20" y="8" width="16" height="25" rx="3" fill="var(--hl)"/><path d="M20 9v24" stroke="var(--surface)" stroke-width="2"/><path d="M8 14h8M8 18h8M24 14h8M24 18h8" stroke="var(--surface)" stroke-width="2" stroke-linecap="round"/></svg>
-    <div><small>Recomendación ${day === t0 ? "de hoy" : "del día"}</small><b>30 minutos de lectura en ${lang}</b><span>${lang === "inglés" ? "Elige un libro en inglés que te guste. Si te atreves, lee un ratito en voz alta." : "Busca un sitio tranquilo y disfruta de un libro en español."}</span></div></div>`;
+  banners += `<button type="button" class="read" data-read="${lang}" aria-label="Empezar 30 minutos de lectura en ${lang}"><svg viewBox="0 0 40 40" aria-hidden="true"><rect x="4" y="8" width="16" height="25" rx="3" fill="var(--t-proj)"/><rect x="20" y="8" width="16" height="25" rx="3" fill="var(--hl)"/><path d="M20 9v24" stroke="var(--surface)" stroke-width="2"/><path d="M8 14h8M8 18h8M24 14h8M24 18h8" stroke="var(--surface)" stroke-width="2" stroke-linecap="round"/></svg>
+    <div><small>Recomendación ${day === t0 ? "de hoy" : "del día"}</small><b>30 minutos de lectura en ${lang}</b><span>${lang === "inglés" ? "Elige un libro en inglés que te guste. Si te atreves, lee un ratito en voz alta." : "Busca un sitio tranquilo y disfruta de un libro en español."}</span></div><em class="go"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M7 4.5v15l13-7.5z"/></svg>Empezar</em></button>`;
   $("#banners").innerHTML = banners;
   $("#day-list").innerHTML = items.length ? items.map(({ t, s, i, late }) => {
     const topics = topicsFor(t, i).map(x => x.titulo).slice(0, 4).join(" · ");
@@ -1198,6 +1231,101 @@ Responde SOLO con JSON: {"explicaciones":[{"punto":"...","explicacion":"..."}],"
     if (m) { a.innerHTML = `<p class="err">${esc(m)}</p><div class="btns" style="justify-content:flex-start"><button class="btn" data-s="review">Intentarlo otra vez</button></div>`; }
   }
 }
+
+/* ---------- temporizador de lectura ---------- */
+const RT_LEN = 30 * 60 * 1000, RT_KEY = "mini-agenda-lectura", RT_C = 326.73;
+const RT_MSGS = ["Ponte cómoda y a disfrutar del libro.", "Cada página cuenta.", "Los buenos lectores se hacen leyendo.", "¿Qué pasará en el siguiente capítulo?", "Leer es viajar sin moverse del sitio.", "¡Vas genial, sigue así!"];
+let rt = null, rtTimer = null, rtLock = null, rtAudio = null, rtArmed = null;
+const rtSave = () => { try { rt && !rt.done ? localStorage.setItem(RT_KEY, JSON.stringify(rt)) : localStorage.removeItem(RT_KEY); } catch (e) {} };
+const rtLeft = () => !rt ? 0 : rt.paused != null ? rt.paused : Math.max(0, rt.end - Date.now());
+const mmss = ms => { const t = Math.ceil(ms / 1000); return `${String(Math.floor(t / 60)).padStart(2, "0")}:${String(t % 60).padStart(2, "0")}`; };
+async function rtWake(on) {
+  try {
+    if (on && !rtLock && "wakeLock" in navigator && !document.hidden) { rtLock = await navigator.wakeLock.request("screen"); rtLock.addEventListener("release", () => { rtLock = null; }); }
+    else if (!on && rtLock) { await rtLock.release(); rtLock = null; }
+  } catch (e) { rtLock = null; }
+}
+function rtUnlockAudio() {
+  try { const AC = window.AudioContext || window.webkitAudioContext; if (!AC) return; rtAudio = rtAudio || new AC(); if (rtAudio.state === "suspended") rtAudio.resume(); } catch (e) {}
+}
+function rtChime() {
+  try {
+    if (!rtAudio) return; const a = rtAudio, t = a.currentTime + .05;
+    [[523.25, 0], [659.25, .18], [783.99, .36], [1046.5, .56], [783.99, 1.1], [1046.5, 1.28]].forEach(([f, d]) => {
+      const o = a.createOscillator(), g = a.createGain(); o.type = "triangle"; o.frequency.value = f;
+      g.gain.setValueAtTime(0, t + d); g.gain.linearRampToValueAtTime(.25, t + d + .02); g.gain.exponentialRampToValueAtTime(.001, t + d + .55);
+      o.connect(g).connect(a.destination); o.start(t + d); o.stop(t + d + .6);
+    });
+  } catch (e) {}
+  try { navigator.vibrate && navigator.vibrate([250, 120, 250, 120, 400]); } catch (e) {}
+}
+function rtDraw() {
+  if (!rt) return;
+  const left = rtLeft(), box = $("#rt");
+  $("#rt-time").textContent = rt.done ? "¡Hecho!" : mmss(left);
+  $("#rt-time").style.fontSize = rt.done ? "clamp(38px,11vw,52px)" : "";
+  $("#rt-sub").textContent = rt.done ? "30 minutos leyendo" : rt.paused != null ? "en pausa" : "quedan";
+  $("#rt-val").style.strokeDashoffset = rt.done ? "0" : String(RT_C * (1 - left / RT_LEN));
+  box.classList.toggle("done", !!rt.done); box.classList.toggle("paused", rt.paused != null && !rt.done);
+  const btns = rt.done
+    ? `<button class="btn ok" data-rt="close">¡Genial, cerrar!</button>`
+    : `<button class="btn ghost" data-rt="pause">${rt.paused != null ? "▶ Seguir" : "❚❚ Pausar"}</button><button class="btn ghost" data-rt="exit">${rtArmed ? "¿Seguro que sales?" : "Salir"}</button>`;
+  if ($("#rt-btns").dataset.v !== btns) { $("#rt-btns").innerHTML = btns; $("#rt-btns").dataset.v = btns; }
+  document.title = rt.done ? "¡Lectura terminada! · Mini Agenda" : `${mmss(left)} · Lectura`;
+}
+function rtTick() {
+  if (!rt || rt.done) return;
+  const left = rtLeft();
+  if (left <= 0) { rtFinish(); return; }
+  const done = 1 - left / RT_LEN, i = Math.min(RT_MSGS.length - 1, Math.floor(done * RT_MSGS.length));
+  if (rt.paused == null && !rtArmed) $("#rt-msg").textContent = left <= 60000 ? "¡Último minuto! Termina la página." : RT_MSGS[i];
+  rtDraw();
+}
+function rtFinish() {
+  rt.done = true; rtSave(); clearInterval(rtTimer); rtTimer = null; rtWake(false);
+  $("#rt-msg").textContent = `¡Fenomenal! Has leído media hora en ${rt.lang}.`;
+  rtDraw(); rtChime(); confetti(160);
+}
+function rtOpen(lang, resume) {
+  rt = resume || { lang, end: Date.now() + RT_LEN, paused: null, done: false };
+  rtArmed = null;
+  $("#rt-title").textContent = `30 minutos de lectura en ${rt.lang}`;
+  $("#rt-kicker").textContent = rt.lang === "inglés" ? "Reading time" : "Rato de lectura";
+  $("#rt-msg").textContent = resume ? "Sigues donde lo dejaste." : RT_MSGS[0];
+  $("#rt-bg").hidden = false; document.body.style.overflow = "hidden";
+  rtSave(); rtDraw();
+  clearInterval(rtTimer); rtTimer = setInterval(rtTick, 250); rtTick();
+  if (rt.paused == null) rtWake(true);
+  setTimeout(() => { const b = $("#rt-btns button"); if (b) b.focus(); }, 50);
+}
+function rtClose() {
+  clearInterval(rtTimer); rtTimer = null; rtWake(false);
+  rt = null; rtArmed = null; rtSave();
+  $("#rt-bg").hidden = true; document.body.style.overflow = ""; document.title = "Mini Agenda";
+}
+function rtExit() {
+  if (rtArmed) { clearTimeout(rtArmed); rtClose(); toast("Vale, otro día seguimos leyendo."); return; }
+  rtArmed = setTimeout(() => { rtArmed = null; rtTick(); }, 3500);
+  $("#rt-msg").textContent = "Si sales, el temporizador se para."; rtDraw();
+}
+document.addEventListener("click", e => {
+  const r = e.target.closest("[data-read]");
+  if (r) { rtUnlockAudio(); if (!rt) rtOpen(r.dataset.read); return; }
+  const b = e.target.closest("[data-rt]");
+  if (!b || !rt) return;
+  const a = b.dataset.rt;
+  if (a === "pause") {
+    rtUnlockAudio();
+    if (rt.paused != null) { rt.end = Date.now() + rt.paused; rt.paused = null; rtWake(true); }
+    else { rt.paused = rtLeft(); rtWake(false); $("#rt-msg").textContent = "En pausa. Cuando quieras, seguimos."; }
+    rtSave(); rtTick();
+  } else if (a === "exit") rtExit();
+  else if (a === "close") rtClose();
+});
+$("#rt-x").addEventListener("click", () => rt && rt.done ? rtClose() : rtExit());
+document.addEventListener("keydown", e => { if (e.key === "Escape" && rt) rt.done ? rtClose() : rtExit(); });
+document.addEventListener("visibilitychange", () => { if (!document.hidden && rt && !rt.done) { rtTick(); if (rt && !rt.done && rt.paused == null) rtWake(true); } });
+try { const saved = JSON.parse(localStorage.getItem(RT_KEY) || "null"); if (saved && saved.lang && !saved.done) rtOpen(saved.lang, saved); } catch (e) {}
 
 /* ---------- confetti & toast ---------- */
 function confetti(count) {
