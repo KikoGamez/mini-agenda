@@ -287,6 +287,13 @@ h1,h2,h3{font-family:var(--f-display);margin:0;text-wrap:balance;font-weight:700
 .thinking{display:flex;align-items:center;gap:10px;font-weight:700;color:var(--muted)}
 .note{font-size:14px;color:var(--muted);font-weight:600;margin:0}
 
+.lang{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap}
+.lang>span{font-size:13px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;color:var(--muted)}
+.lang-seg{display:flex;background:var(--surface);border:1px solid var(--line);border-radius:999px;padding:3px}
+.lang-seg button{border:0;background:none;border-radius:999px;padding:7px 16px;font-weight:800;font-size:15px;color:var(--muted);min-height:38px}
+.lang-seg button[aria-pressed="true"]{background:var(--accent);color:var(--accent-ink)}
+.lang-seg button:disabled{opacity:.6;cursor:default}
+
 /* quiz */
 .qintro{display:flex;gap:16px;align-items:center;flex-wrap:wrap}
 .qintro div{flex:1;min-width:200px}
@@ -529,6 +536,16 @@ function holidayName(s) {
   if (s > SCHOOL.end) return "Vacaciones de verano";
   if (s < SCHOOL.start) return "Vacaciones";
   return null;
+}
+// Idioma del contenido: inglés por defecto (TEMS da casi todo en inglés), español en Lengua y Sociales.
+const SPANISH_SUBJECT = /\b(lengua|castellano|espanol|spanish|sociales)\b/i;
+const plain = x => String(x || "").normalize("NFD").replace(/[̀-ͯ]/g, "");
+const autoLang = t => SPANISH_SUBJECT.test(plain(t.title)) ? "es" : "en";
+const contentLang = t => t.lang === "es" || t.lang === "en" ? t.lang : autoLang(t);
+function langRule(t) {
+  return contentLang(t) === "en"
+    ? `Idioma: escribe TODO el contenido (resumen, palabras clave, preguntas, opciones y explicaciones) en inglés británico, claro y sencillo para su edad, como lo daría su profe en el colegio. Si es un examen de un idioma extranjero (francés, alemán…), las preguntas pueden ir en ese idioma y las explicaciones en inglés.`
+    : `Idioma: escribe todo el contenido en español. Si algún término se da también en inglés en el colegio, puedes ponerlo entre paréntesis. Si es un examen de un idioma extranjero, las preguntas pueden ir en ese idioma y las explicaciones en español.`;
 }
 const readingLang = s => { const [y, m, d] = s.split("-").map(Number); return Math.floor(Date.UTC(y, m - 1, d) / 86400000) % 2 === 0 ? "inglés" : "español"; };
 const mondayOf = s => { const d = parse(s); d.setDate(d.getDate() - (d.getDay() + 6) % 7); return iso(d); };
@@ -1011,6 +1028,11 @@ function openStudy(id, i, gate) {
 }
 function curTask() { return openSel && S.tasks.find(x => x.id === openSel.id); }
 
+function langSwitch(t) {
+  const l = contentLang(t), busy = !!sheetState.loading;
+  const b = (v, txt) => `<button type="button" data-s="lang" data-v="${v}" aria-pressed="${l === v}" ${busy ? "disabled" : ""}>${txt}</button>`;
+  return `<div class="lang"><span>Idioma de las explicaciones</span><div class="lang-seg" role="group" aria-label="Idioma de las explicaciones">${b("en", "English")}${b("es", "Español")}</div></div>`;
+}
 function drawStudy() {
   const t = curTask(); if (!t) return closeStudy();
   const { i, gate } = openSel, s = t.sessions[i], isExam = t.type === "examen";
@@ -1028,8 +1050,9 @@ function drawStudy() {
       ${reading.has(t.id) ? `<div class="thinking"><span class="spin"></span>Leyendo el temario…</div>` : ""}
       ${S.ai ? "" : `<p class="note">Entra en la agenda para usar los resúmenes.</p>`}</div>`;
   } else if (data) {
-    body = `<div class="box"><h3>Resumen</h3><ul>${(data.resumen || []).map(p => `<li>${esc(p)}</li>`).join("")}</ul></div>`;
-    if ((data.palabras || []).length) body += `<div class="box"><h3>Palabras clave</h3><dl class="kw">${data.palabras.map(w => `<dt>${esc(w.termino)}</dt><dd>${esc(w.significado)}</dd>`).join("")}</dl></div>`;
+    const en = contentLang(t) === "en";
+    body = `<div class="box"><h3>${en ? "Summary" : "Resumen"}</h3><ul>${(data.resumen || []).map(p => `<li>${esc(p)}</li>`).join("")}</ul></div>`;
+    if ((data.palabras || []).length) body += `<div class="box"><h3>${en ? "Key words" : "Palabras clave"}</h3><dl class="kw">${data.palabras.map(w => `<dt>${esc(w.termino)}</dt><dd>${esc(w.significado)}</dd>`).join("")}</dl></div>`;
     if (isExam && (data.preguntas || []).length) body += `<div class="box" id="quiz-area">${quizAreaHtml(t, i, data)}</div>`;
     else body += `<div class="btns" style="justify-content:flex-start">${s.done ? "" : `<button class="btn ok" data-s="done">Ya lo he hecho</button>`}<button class="btn ghost" data-s="again">Explícamelo de otra forma</button></div>`;
   } else {
@@ -1044,6 +1067,7 @@ function drawStudy() {
   $("#sheet").innerHTML = `
     <div class="sheet-h"><div style="flex:1;min-width:0"><h2 id="sheet-title">${esc(t.title)}</h2><p>${esc(sessionLabel(t, i))} · ${isExam ? "examen" : "para"} ${esc(relDay(t.due))}</p></div><button class="x" data-s="close" aria-label="Cerrar">×</button></div>
     ${gateHtml}
+    ${langSwitch(t)}
     ${chips.length ? `<div class="topics">${chips.map(x => `<span>${esc(x.titulo)}</span>`).join("")}</div>` : ""}
     ${body}`;
 }
@@ -1141,6 +1165,12 @@ $("#sheet").addEventListener("click", e => {
     refreshQuiz();
   }
   else if (a === "newquiz") newQuiz(t, i);
+  else if (a === "lang") {
+    const v = b.dataset.v; if (v === contentLang(t)) return;
+    t.lang = v; t.study = {}; quiz = null; sheetState = {}; putTask(t);
+    toast(v === "en" ? "Ahora te lo explico en inglés." : "Ahora te lo explico en español.");
+    if (S.ai && hasInfo(t)) generate(false); else drawStudy();
+  }
   else if (a === "pick" && quiz && !quiz.answered) {
     const q = quiz.qs[quiz.idx], k = +b.dataset.o, ok = k === q.correcta;
     quiz.answered = true; quiz.last = k; quiz.picks.push(ok); quiz.cheer = pick(GOOD);
@@ -1182,7 +1212,7 @@ Si sí se sabe, prepara:
 1. "resumen": 4 a 7 puntos clave, cada uno de una o dos frases.
 2. "palabras": 3 a 6 términos clave con su significado breve.
 ${isExam ? `3. "preguntas": un mini test de 6 preguntas tipo test, de dificultad adecuada para su edad, 4 opciones cada una, una sola correcta ("correcta" = índice 0-3, varía la posición), y "explicacion" de una frase que enseñe por qué.` : `3. "preguntas": [] (vacío).`}
-Idioma: explica en español. Como el colegio es británico, si la asignatura se da en inglés (Science, History, Geography, Maths…) pon los términos clave también en inglés entre paréntesis. Si es un examen de idioma (francés, inglés, alemán…), las preguntas pueden ir en ese idioma y las explicaciones en español.
+${langRule(t)} (La "pregunta" de faltaInfo, si la usas, va siempre en español.)
 Responde SOLO con JSON: {"resumen":["..."],"palabras":[{"termino":"...","significado":"..."}],"preguntas":[{"pregunta":"...","opciones":["...","...","...","..."],"correcta":0,"explicacion":"..."}]}`;
   if (ctl) ctl.abort();
   ctl = new AbortController();
@@ -1237,7 +1267,7 @@ ${(data.resumen || []).map(x => "- " + x).join("\n")}
 Ya le han salido estas preguntas. NO repitas ninguna ni hagas versiones casi iguales; pregunta otros datos, ejemplos o aplicaciones del mismo contenido:
 ${used.map(q => "- " + q).join("\n")}
 Haz 6 preguntas tipo test de dificultad adecuada para su edad, 4 opciones cada una, una sola correcta ("correcta" = índice 0-3, varía la posición), y "explicacion" de una frase que enseñe por qué.
-Explica en español (con términos en inglés entre paréntesis si la asignatura se da en inglés). Si es un examen de idioma, las preguntas pueden ir en ese idioma.
+${langRule(t)}
 Responde SOLO con JSON: {"preguntas":[{"pregunta":"...","opciones":["...","...","...","..."],"correcta":0,"explicacion":"..."}]}`, { signal: ctl.signal });
     const qs = normQs(res.preguntas);
     if (!qs.length) throw { code: "invalid_json" };
@@ -1267,7 +1297,7 @@ async function doReview(t, i, missed) {
 Eres su profe particular. En un mini test sobre "${t.title}" ha fallado estas preguntas:
 ${missed.map((m, k) => `${k + 1}. ${m.p} — Respuesta correcta: ${m.r}. (${m.e})`).join("\n")}
 Explícale cada punto de forma muy sencilla y con un truco para recordarlo (2 o 3 frases), y crea 3 preguntas nuevas tipo test (4 opciones, una correcta) sobre esos mismos puntos, distintas a las anteriores.
-Explica en español (con términos en inglés entre paréntesis si la asignatura se da en inglés).
+${langRule(t)}
 Responde SOLO con JSON: {"explicaciones":[{"punto":"...","explicacion":"..."}],"preguntas":[{"pregunta":"...","opciones":["...","...","...","..."],"correcta":0,"explicacion":"..."}]}`, { signal: ctl.signal });
     const qs = normQs(res.preguntas);
     const ex = (Array.isArray(res.explicaciones) ? res.explicaciones : []).filter(x => x && x.explicacion);
