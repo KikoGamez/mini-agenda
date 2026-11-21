@@ -575,6 +575,25 @@ function removeTask(id) {
   S.tasks = S.tasks.filter(t => t.id !== id); render();
   if (sb) return enqueue(id, track(async () => must(await sb.from("tasks").delete().eq("user_id", uid).eq("id", id))));
 }
+/* ---------- biblioteca de contenido generado con IA ---------- */
+// Cada resumen, test y repaso se guarda en "ai_library" para reutilizarlo sin volver a llamar a Claude.
+const STOP = new Set("de del la el los las un una y o en a al para con por sobre que examen test prueba control tema temas unidad lesson unit su sus mi mis tu tus es son the of and a an to in on for its".split(" "));
+const words = x => plain(x).toLowerCase().replace(/[^a-z0-9ñ ]+/g, " ").split(/\s+/).filter(w => w && !STOP.has(w));
+const topicText = (t, i) => { const tp = topicsFor(t, i); return tp.length ? tp.map(x => x.titulo).join(", ") : String(t.tema || ""); };
+const libKey = (t, i) => `${[...new Set(words(t.title))].sort().join(" ")}|${[...new Set(words(topicText(t, i)))].sort().join(" ")}`;
+const qKey = q => words(q).join(" ");
+async function libFind(t, i, kinds) {
+  if (!sb || !uid) return [];
+  try {
+    const r = await sb.from("ai_library").select("kind,data,created_at").eq("topic_key", libKey(t, i)).eq("lang", contentLang(t)).in("kind", kinds).order("created_at", { ascending: false }).limit(30);
+    return r.error ? [] : (r.data || []);
+  } catch (e) { return []; }
+}
+function libSave(kind, t, i, data) {
+  if (!sb || !uid) return;
+  sb.from("ai_library").insert({ user_id: uid, kind, topic_key: libKey(t, i), lang: contentLang(t), subject: t.title, topic: topicText(t, i).slice(0, 500), data: clone(data) })
+    .then(r => { if (r.error) console.warn("biblioteca:", r.error.message); }, () => {});
+}
 function putProfile() {
   render();
   if (sb) return enqueue("profile", track(async () => must(await sb.from("profiles").upsert({ user_id: uid, data: clone(S.profile), updated_at: new Date().toISOString() }))));
@@ -1216,8 +1235,22 @@ ${langRule(t)} (La "pregunta" de faltaInfo, si la usas, va siempre en español.)
 Responde SOLO con JSON: {"resumen":["..."],"palabras":[{"termino":"...","significado":"..."}],"preguntas":[{"pregunta":"...","opciones":["...","...","...","..."],"correcta":0,"explicacion":"..."}]}`;
   if (ctl) ctl.abort();
   ctl = new AbortController();
-  const id = t.id;
+  const id = t.id, myCtl = ctl;
   sheetState = { loading: true }; drawStudy();
+  if (!fresh && s.kind !== "refuerzo") {
+    const hit = (await libFind(t, i, ["study"])).map(r => r.data).find(d => d && (d.resumen || []).length && (!isExam || (d.preguntas || []).length));
+    if (!openSel || openSel.id !== id) return;
+    if (myCtl.signal.aborted) { sheetState = {}; drawStudy(); return; }
+    if (hit) {
+      const tt = S.tasks.find(x => x.id === id); if (!tt) return;
+      const d = { resumen: hit.resumen, palabras: hit.palabras || [], preguntas: hit.preguntas || [], at: Date.now(), guardado: true };
+      d.usadas = usedQs(tt, i).concat(d.preguntas.map(q => q.pregunta)).slice(-40);
+      tt.study = tt.study || {}; tt.study[i] = d;
+      quiz = null; sheetState = {}; putTask(tt); drawStudy();
+      toast("Ya lo tenía guardado: no he gastado ninguna consulta.");
+      return;
+    }
+  }
   try {
     const res = await S.ai.json(prompt, { signal: ctl.signal });
     if (!openSel || openSel.id !== id) return;
@@ -1233,6 +1266,7 @@ Responde SOLO con JSON: {"resumen":["..."],"palabras":[{"termino":"...","signifi
     tt.study = tt.study || {}; tt.study[i] = d;
     quiz = null; sheetState = {};
     putTask(tt); drawStudy();
+    if (s.kind !== "refuerzo") libSave("study", tt, i, { resumen: d.resumen, palabras: d.palabras, preguntas: d.preguntas });
   } catch (e) {
     if (openSel && openSel.id === id) { sheetState = { error: sampleError(e) || null }; drawStudy(); }
   }
@@ -1257,7 +1291,20 @@ async function newQuiz(t, i) {
   a.innerHTML = `<div class="thinking"><span class="spin"></span>Preparando un test nuevo…</div><div class="btns" style="justify-content:flex-start"><button class="btn ghost sm" data-s="stop">Cancelar</button></div>`;
   if (ctl) ctl.abort();
   ctl = new AbortController();
-  const id = t.id;
+  const id = t.id, myCtl = ctl;
+  const seen = new Set(used.map(qKey)), saved = [];
+  for (const r of await libFind(t, i, ["study", "quiz"]))
+    for (const q of normQs(r.data && r.data.preguntas)) { const k = qKey(q.pregunta); if (!seen.has(k)) { seen.add(k); saved.push(q); } }
+  if (myCtl.signal.aborted) { if (openSel && openSel.id === id) { quiz = null; refreshQuiz(); } return; }
+  if (saved.length >= 6) {
+    const qs = shuffle(saved).slice(0, 6), tt = S.tasks.find(x => x.id === id);
+    if (!tt || !tt.study || !tt.study[i]) return;
+    tt.study[i].preguntas = qs; tt.study[i].usadas = used.concat(qs.map(q => q.pregunta)).slice(-40); putTask(tt);
+    if (!openSel || openSel.id !== id) return;
+    quiz = { kind: "main", qs: shuffleQs(qs), idx: 0, picks: [], missed: [], answered: false };
+    refreshQuiz(); toast("Test nuevo con preguntas guardadas: sin gastar consultas.");
+    return;
+  }
   try {
     const res = await S.ai.json(`${school()}
 Eres su profe particular. Prepara un mini test NUEVO para el examen "${t.title}" (${longDate(t.due)}).
@@ -1274,7 +1321,7 @@ Responde SOLO con JSON: {"preguntas":[{"pregunta":"...","opciones":["...","...",
     const tt = S.tasks.find(x => x.id === id); if (!tt || !tt.study || !tt.study[i]) return;
     tt.study[i].preguntas = qs;
     tt.study[i].usadas = used.concat(qs.map(q => q.pregunta)).slice(-40);
-    putTask(tt);
+    putTask(tt); libSave("quiz", tt, i, { preguntas: qs });
     if (!openSel || openSel.id !== id) return;
     quiz = { kind: "main", qs: shuffleQs(qs), idx: 0, picks: [], missed: [], answered: false };
     refreshQuiz();
@@ -1303,6 +1350,7 @@ Responde SOLO con JSON: {"explicaciones":[{"punto":"...","explicacion":"..."}],"
     const ex = (Array.isArray(res.explicaciones) ? res.explicaciones : []).filter(x => x && x.explicacion);
     if (!qs.length && !ex.length) throw { code: "invalid_json" };
     const pre = `<h3>Vamos a repasar</h3><div class="review">${ex.map(x => `<div><b>${esc(x.punto || "")}</b>${esc(x.explicacion)}</div>`).join("")}</div>${qs.length ? `<h3 style="margin-top:6px">Ahora, ¡a comprobarlo!</h3>` : ""}`;
+    libSave("review", t, i, { fallos: missed, explicaciones: ex, preguntas: qs });
     quiz = { kind: "review", qs, idx: 0, picks: [], missed: [], answered: false, pre };
     if (!qs.length) { quiz.result = { ok: 0, n: 0, pct: 1, stars: 0 }; }
     refreshQuiz();

@@ -72,4 +72,5 @@ En el iPad o el móvil, usa **Compartir → Añadir a pantalla de inicio** para 
 
 - **El proyecto gratuito de Supabase se pausa tras 7 días sin uso.** Si pasa, se reactiva desde su panel.
 - **Calendario del colegio:** las fechas sin cole están en la constante `SCHOOL` de `index.html`. Ahora tiene el curso 2026-27 de TEMS y hay que actualizarla cada curso.
+- **Biblioteca de contenido:** cada resumen, test y repaso que genera la IA se guarda en la tabla `ai_library`. Si se vuelve a pedir el mismo tema en el mismo idioma, se reutiliza sin llamar a Claude. Si tu proyecto es anterior a esta tabla, ejecuta [`supabase/biblioteca.sql`](supabase/biblioteca.sql) en el SQL Editor.
 - **Datos personales:** el nombre, la edad y el curso se guardan en la base de datos, no en el código. Este repositorio es público.
