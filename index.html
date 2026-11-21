@@ -1053,7 +1053,7 @@ function quizAreaHtml(t, i, data) {
   if (!quiz) {
     return `<div class="qintro"><div><h3>¿Lo controlas?</h3><p>${data.preguntas.length} preguntas rápidas sobre lo que has estudiado.${s.score ? ` Tu mejor nota: ${esc(s.score)}.` : ""}</p></div>
       ${s.stars ? `<div class="stars" aria-label="${s.stars} estrellas">${[1, 2, 3].map(k => STAR(k <= s.stars).replace('class="on"', "")).join("")}</div>` : ""}</div>
-      <div class="btns" style="justify-content:flex-start"><button class="btn" data-s="start">${s.score ? "Hacer el test otra vez" : "Empezar el test"}</button><button class="btn ghost" data-s="again">Otro resumen y otro test</button></div>`;
+      <div class="btns" style="justify-content:flex-start"><button class="btn" data-s="${s.score ? "newquiz" : "start"}">${s.score ? "Hacer un test nuevo" : "Empezar el test"}</button><button class="btn ghost" data-s="again">Otro resumen y otro test</button></div>`;
   }
   return (quiz.pre || "") + (quiz.idx < quiz.qs.length ? questionHtml() : resultHtml(t, i));
 }
@@ -1085,16 +1085,17 @@ function resultHtml(t, i) {
   } else if (r.pct >= 0.9) {
     msg = "¡Lo controlas de maravilla! Estás lista para el examen.";
     if (!s.done) btns += `<button class="btn ok" data-s="done">Marcar como hecho</button>`;
-    btns += `<button class="btn ghost" data-s="again">Otro test distinto</button>`;
+    btns += `<button class="btn ghost" data-s="newquiz">Otro test distinto</button>`;
   } else if (r.pct >= 0.7) {
     msg = "¡Muy bien! Casi perfecto. Repasa lo que fallaste y lo bordas.";
     if (!s.done) btns += `<button class="btn ok" data-s="done">Marcar como hecho</button>`;
     if (quiz.missed.length) btns += `<button class="btn ghost" data-s="review">Repasar lo que fallé</button>`;
+    btns += `<button class="btn ghost" data-s="newquiz">Otro test distinto</button>`;
   } else {
     msg = "Todavía no lo tienes del todo, ¡pero vas por buen camino! Vamos a repasar un poquito lo que has fallado.";
     btns += `<button class="btn" data-s="review">Repasar lo que fallé</button>`;
     if (canExtra) btns += `<button class="btn ghost" data-s="extra">Añadir un repaso extra ${extraDay}</button>`;
-    btns += `<button class="btn ghost" data-s="again">Otro test distinto</button>`;
+    btns += `<button class="btn ghost" data-s="newquiz">Otro test distinto</button>`;
   }
   return `<div class="result">
     ${quiz.kind === "review" ? "" : `<div class="stars" aria-label="${r.stars} de 3 estrellas">${[1, 2, 3].map(k => STAR(k <= r.stars)).join("")}</div>`}
@@ -1136,10 +1137,10 @@ $("#sheet").addEventListener("click", e => {
   }
   else if (a === "done" || a === "skip-done") { markDone(t, i, true); closeStudy(); }
   else if (a === "start") {
-    const qs = t.study[i].preguntas;
-    quiz = { kind: "main", qs, idx: 0, picks: [], missed: [], answered: false };
+    quiz = { kind: "main", qs: shuffleQs(t.study[i].preguntas), idx: 0, picks: [], missed: [], answered: false };
     refreshQuiz();
   }
+  else if (a === "newquiz") newQuiz(t, i);
   else if (a === "pick" && quiz && !quiz.answered) {
     const q = quiz.qs[quiz.idx], k = +b.dataset.o, ok = k === q.correcta;
     quiz.answered = true; quiz.last = k; quiz.picks.push(ok); quiz.cheer = pick(GOOD);
@@ -1175,7 +1176,7 @@ Eres su profe particular: cercana, alegre y clara. Frases cortas, ejemplos de su
 ${isExam ? `Tiene un examen: "${t.title}" el ${longDate(t.due)}. Hoy toca: ${sessionLabel(t, i)}.` : `Tiene esta tarea (${TYPE_LABEL[t.type].toLowerCase()}): "${t.title}", para el ${longDate(t.due)}.`}
 ${tem ? `Temario del examen (sacado de su foto):\n${tem.texto}\n\nTemas en los que centrarse hoy: ${topics.map(x => `${x.titulo}${x.detalles ? ` (${x.detalles})` : ""}`).join("; ")}` : `Lo que entra, escrito por la alumna: "${t.tema || ""}".${isExam && topics.length && s.kind === "estudiar" ? ` Hoy céntrate en: ${topics.map(x => x.titulo).join("; ")}.` : ""} No hay foto del temario: usa lo que se suele dar sobre eso en su curso según el currículo británico.`}
 ${s.kind === "refuerzo" && (t.weak || []).length ? `Es un repaso extra. En los tests anteriores falló esto (pregunta → respuesta correcta): ${t.weak.join(" | ")}. Insiste en esos puntos.` : ""}
-${fresh ? "Ya hizo un test antes: usa preguntas distintas y enfoques nuevos." : ""}
+${fresh ? `Ya hizo un test antes: usa preguntas distintas y enfoques nuevos.${usedQs(t, i).length ? ` NO repitas ninguna de estas preguntas que ya le salieron:\n${usedQs(t, i).map(q => "- " + q).join("\n")}` : ""}` : ""}
 IMPORTANTE: si con esta información no se sabe qué contenido concreto entra (por ejemplo, solo dice "lengua", "mates" o "el examen" sin un tema concreto), NO inventes nada y responde solo {"faltaInfo":true,"pregunta":"una pregunta corta a la alumna sobre qué contenido concreto entra (temas, lecciones o páginas)"}.
 Si sí se sabe, prepara:
 1. "resumen": 4 a 7 puntos clave, cada uno de una o dos frases.
@@ -1196,6 +1197,7 @@ Responde SOLO con JSON: {"resumen":["..."],"palabras":[{"termino":"...","signifi
       palabras: (Array.isArray(res.palabras) ? res.palabras : []).filter(w => w && w.termino).map(w => ({ termino: String(w.termino), significado: String(w.significado || "") })).slice(0, 8),
       preguntas: normQs(res.preguntas), at: Date.now()
     };
+    d.usadas = usedQs(t, i).concat(d.preguntas.map(q => q.pregunta)).slice(-40);
     if (!d.resumen.length) throw { code: "invalid_json" };
     const tt = S.tasks.find(x => x.id === id); if (!tt) return;
     tt.study = tt.study || {}; tt.study[i] = d;
@@ -1203,6 +1205,54 @@ Responde SOLO con JSON: {"resumen":["..."],"palabras":[{"termino":"...","signifi
     putTask(tt); drawStudy();
   } catch (e) {
     if (openSel && openSel.id === id) { sheetState = { error: sampleError(e) || null }; drawStudy(); }
+  }
+}
+
+function shuffle(a) { const r = a.slice(); for (let k = r.length - 1; k > 0; k--) { const j = Math.floor(Math.random() * (k + 1)); [r[k], r[j]] = [r[j], r[k]]; } return r; }
+function shuffleQs(qs) {
+  return shuffle(qs).map(q => {
+    const order = shuffle(q.opciones.map((_, k) => k));
+    return { ...q, opciones: order.map(k => q.opciones[k]), correcta: order.indexOf(q.correcta) };
+  });
+}
+function usedQs(t, i) {
+  const d = t.study && t.study[i]; if (!d) return [];
+  return (d.usadas || (d.preguntas || []).map(q => q.pregunta)).slice(-40);
+}
+
+async function newQuiz(t, i) {
+  if (!S.ai) { toast("Entra en la agenda para hacer tests nuevos."); return; }
+  const a = $("#quiz-area"); if (!a) return;
+  const data = t.study[i], topics = topicsFor(t, i), tem = t.temario, used = usedQs(t, i);
+  a.innerHTML = `<div class="thinking"><span class="spin"></span>Preparando un test nuevo…</div><div class="btns" style="justify-content:flex-start"><button class="btn ghost sm" data-s="stop">Cancelar</button></div>`;
+  if (ctl) ctl.abort();
+  ctl = new AbortController();
+  const id = t.id;
+  try {
+    const res = await S.ai.json(`${school()}
+Eres su profe particular. Prepara un mini test NUEVO para el examen "${t.title}" (${longDate(t.due)}).
+${tem ? `Temario:\n${tem.texto}\nTemas de hoy: ${topics.map(x => x.titulo).join("; ")}` : `Lo que entra: "${t.tema || ""}".`}
+Resumen que ha estudiado hoy:
+${(data.resumen || []).map(x => "- " + x).join("\n")}
+Ya le han salido estas preguntas. NO repitas ninguna ni hagas versiones casi iguales; pregunta otros datos, ejemplos o aplicaciones del mismo contenido:
+${used.map(q => "- " + q).join("\n")}
+Haz 6 preguntas tipo test de dificultad adecuada para su edad, 4 opciones cada una, una sola correcta ("correcta" = índice 0-3, varía la posición), y "explicacion" de una frase que enseñe por qué.
+Explica en español (con términos en inglés entre paréntesis si la asignatura se da en inglés). Si es un examen de idioma, las preguntas pueden ir en ese idioma.
+Responde SOLO con JSON: {"preguntas":[{"pregunta":"...","opciones":["...","...","...","..."],"correcta":0,"explicacion":"..."}]}`, { signal: ctl.signal });
+    const qs = normQs(res.preguntas);
+    if (!qs.length) throw { code: "invalid_json" };
+    const tt = S.tasks.find(x => x.id === id); if (!tt || !tt.study || !tt.study[i]) return;
+    tt.study[i].preguntas = qs;
+    tt.study[i].usadas = used.concat(qs.map(q => q.pregunta)).slice(-40);
+    putTask(tt);
+    if (!openSel || openSel.id !== id) return;
+    quiz = { kind: "main", qs: shuffleQs(qs), idx: 0, picks: [], missed: [], answered: false };
+    refreshQuiz();
+  } catch (e) {
+    if (!openSel || openSel.id !== id) return;
+    const m = sampleError(e), area = $("#quiz-area"); if (!area) return;
+    if (m) area.innerHTML = `<p class="err">${esc(m)}</p><div class="btns" style="justify-content:flex-start"><button class="btn" data-s="newquiz">Intentarlo otra vez</button></div>`;
+    else { quiz = null; refreshQuiz(); }
   }
 }
 
